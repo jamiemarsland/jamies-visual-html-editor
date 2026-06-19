@@ -1,0 +1,18 @@
+# Re-include the compiled plugin assets — pressship excludes build/ by default,
+# but this plugin ships its editor JS/CSS from build/.
+!build
+!build/**
+
+# Development-only files: kept in the GitHub repo, never shipped in the zip.
+src
+package.json
+package-lock.json
+README.md
+
+# WordPress.org listing assets (screenshots, icon, banner). Pushed to the SVN
+# assets/ directory on release; never shipped inside the installable plugin zip.
+.wordpress-org
+.wordpress-org/**
+
+# Don't ship the ignore file itself.
+.pressshipignore

@@ -1,0 +1,56 @@
+/**
+ * Editor styles for Jamie's Visual HTML Editor.
+ *
+ * Loaded only in the block editor. The interactive "edit surface" outlines and
+ * badges are injected at runtime (see injectEditStyles in index.js); these
+ * rules cover the toolbar code view and the editing modals.
+ */
+
+.vc-html-edit__code {
+	font-family: Menlo, Consolas, monaco, monospace;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.vc-edit-modal__fields {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 360px;
+}
+
+.vc-edit-modal__fields .components-base-control {
+	margin-bottom: 0;
+}
+
+.vc-edit-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	padding-top: 4px;
+}
+
+.vc-image-modal__preview {
+	background: #f6f7f7;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	display: flex;
+	justify-content: center;
+	padding: 8px;
+}
+
+.vc-image-modal__preview img {
+	display: block;
+	height: auto;
+	max-height: 200px;
+	max-width: 100%;
+}
+
+.vc-bg-modal__preview {
+	background-color: #f6f7f7;
+	background-position: 50%;
+	background-repeat: no-repeat;
+	background-size: cover;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	min-height: 120px;
+}
