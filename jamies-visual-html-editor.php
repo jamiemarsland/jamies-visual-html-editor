@@ -28,17 +28,17 @@ require_once JVHE_DIR . 'includes/class-plugin.php';
 /**
  * Boot the plugin.
  *
- * @return Jamies_Visual_HTML_Editor
+ * @return Jamies_Visual_HTML_Editor_Plugin
  */
-function jamies_visual_html_editor() {
+function jamies_visual_html_editor_init() {
 	static $plugin = null;
 
 	if ( null === $plugin ) {
-		$plugin = new Jamies_Visual_HTML_Editor();
+		$plugin = new Jamies_Visual_HTML_Editor_Plugin();
 		$plugin->init();
 	}
 
 	return $plugin;
 }
 
-jamies_visual_html_editor();
+jamies_visual_html_editor_init();

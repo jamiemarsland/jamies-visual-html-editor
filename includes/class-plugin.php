@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Enqueues the block-editor enhancement for the Custom HTML block and applies
  * Wide / Full alignment on the front end.
  */
-class Jamies_Visual_HTML_Editor {
+class Jamies_Visual_HTML_Editor_Plugin {
 
 	/**
 	 * Register WordPress hooks.
