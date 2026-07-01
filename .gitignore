@@ -1,3 +1,6 @@
+# Local pressship SVN working copy — not part of the source
+.pressship-svn/
+
 node_modules/
 .DS_Store
 *.log
