@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jamie's Visual HTML Editor
  * Description:       Enhances the core Custom HTML block: paste any HTML, then let editors click directly on text, images, links, and backgrounds to edit them — without touching the markup. Switch between "Edit content" and "Edit code" from the block toolbar, and add Wide/Full width alignment.
- * Version:           0.4
+ * Version:           0.2
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * Author:            Jamie Marsland
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'JVHE_VERSION', '0.4' );
+define( 'JVHE_VERSION', '0.2' );
 define( 'JVHE_FILE', __FILE__ );
 define( 'JVHE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JVHE_URL', plugin_dir_url( __FILE__ ) );

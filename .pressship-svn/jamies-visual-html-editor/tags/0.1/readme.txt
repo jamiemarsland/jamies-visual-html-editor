@@ -4,7 +4,7 @@ Tags: custom html, inline editing, block editor, full width, images
 Requires at least: 6.4
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.4
+Stable tag: 0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ Jamie's Visual HTML Editor enhances the core Custom HTML block so you can paste 
 
 * **Edit content** — render the HTML live and click any heading, paragraph, list item, link, or button to edit its text in place. Click any `<img>` to replace it from the Media Library, change its URL, or edit its alt text. Add `data-vc-bg` and an inline `background-image` on hero sections to make backgrounds editable too.
 * **Edit code** — the normal raw-HTML view for pasting or writing markup.
-* **Wide and Full width** — adds Wide and Full alignment options to the Custom HTML block. It does not change the block's content width; it only lets you choose Wide or Full alignment so full-bleed sections can break out of the theme's content area.
+* **Wide and Full width** — adds Wide and Full alignment to the Custom HTML block so full-bleed sections can break out of the theme's content width.
 
 Content is stored as a native Custom HTML block, so revisions and saving work exactly as they do in core. The plugin only changes how the block is edited and aligned.
 
@@ -71,27 +71,10 @@ No third-party libraries are bundled; the plugin relies only on the WordPress-pr
 
 == Upgrade Notice ==
 
-= 0.3 =
-Fixes the missing Wide/Full alignment control in the block toolbar, and adds a plugin icon.
-
-= 0.2 =
-Clarifies the Wide/Full width description.
-
 = 0.1 =
 Initial release.
 
 == Changelog ==
-
-= 0.4 =
-* Added a live demo preview (WordPress Playground blueprint).
-
-= 0.3 =
-* Fixed: the Wide/Full alignment control now appears in the Custom HTML block toolbar (it was previously hidden because the custom editor replaced the block's default controls).
-* Wide/Full alignment selection is now stored reliably via a registered `align` attribute.
-* Added a plugin icon.
-
-= 0.2 =
-* Clarified in the description that the plugin adds Wide and Full alignment options and does not change the block's content width.
 
 = 0.1 =
 * Initial release.

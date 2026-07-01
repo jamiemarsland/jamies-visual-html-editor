@@ -22,6 +22,7 @@ import {
 } from '@wordpress/element';
 import {
 	BlockControls,
+	BlockAlignmentControl,
 	useBlockProps,
 	PlainText,
 	MediaUploadCheck,
@@ -1221,6 +1222,13 @@ function EditHtmlBlock( { attributes, setAttributes } ) {
 					</ToolbarButton>
 				</ToolbarGroup>
 			</BlockControls>
+			<BlockControls group="block">
+				<BlockAlignmentControl
+					value={ attributes.align }
+					onChange={ ( align ) => setAttributes( { align } ) }
+					controls={ [ 'wide', 'full' ] }
+				/>
+			</BlockControls>
 			<div { ...blockProps }>
 				{ mode === 'text' ? (
 					<VisualEditor
@@ -1277,6 +1285,10 @@ addFilter(
 			supports: {
 				...settings.supports,
 				align: [ 'wide', 'full' ],
+			},
+			attributes: {
+				...settings.attributes,
+				align: { type: 'string' },
 			},
 		};
 	}
