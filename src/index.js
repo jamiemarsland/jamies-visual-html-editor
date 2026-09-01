@@ -13,6 +13,7 @@
 
 import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
+import { useSelect } from '@wordpress/data';
 import {
 	useState,
 	useRef,
@@ -1197,12 +1198,31 @@ function VisualEditor( { content, setContent } ) {
 /* Block edit wrapper — toolbar toggle between content and code views         */
 /* -------------------------------------------------------------------------- */
 
-function EditHtmlBlock( { attributes, setAttributes } ) {
+function EditHtmlBlock( { attributes, setAttributes, clientId } ) {
+	/*
+	 * core/html declares its `content` attribute without a `source`, so a block
+	 * parsed from already-saved post content arrives with empty attributes and
+	 * the markup sitting on the block's `originalContent` instead. Reading only
+	 * attributes.content meant every previously saved block opened blank.
+	 * Fall back to the saved markup for display, without writing it back until
+	 * the editor actually changes something.
+	 */
+	const savedMarkup = useSelect(
+		( select ) => {
+			const block = select( 'core/block-editor' ).getBlock( clientId );
+			return block?.originalContent || '';
+		},
+		[ clientId ]
+	);
+
+	const attrContent = attributes.content || '';
+	const content = attrContent.trim() ? attrContent : savedMarkup;
+
 	const [ mode, setMode ] = useState( () =>
-		attributes.content && attributes.content.trim() ? 'text' : 'code'
+		content && content.trim() ? 'text' : 'code'
 	);
 	const blockProps = useBlockProps( { className: 'vc-html-edit' } );
-	const setContent = ( content ) => setAttributes( { content } );
+	const setContent = ( next ) => setAttributes( { content: next } );
 
 	return (
 		<Fragment>
@@ -1232,12 +1252,12 @@ function EditHtmlBlock( { attributes, setAttributes } ) {
 			<div { ...blockProps }>
 				{ mode === 'text' ? (
 					<VisualEditor
-						content={ attributes.content }
+						content={ content }
 						setContent={ setContent }
 					/>
 				) : (
 					<PlainText
-						value={ attributes.content }
+						value={ content }
 						onChange={ setContent }
 						className="vc-html-edit__code"
 						placeholder={ __(

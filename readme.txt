@@ -2,9 +2,9 @@
 Contributors: jamiemarsland
 Tags: custom html, inline editing, block editor, full width, images
 Requires at least: 6.4
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4
+Stable tag: 0.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,11 @@ Clarifies the Wide/Full width description.
 Initial release.
 
 == Changelog ==
+
+= 0.5 =
+* Fix: existing Custom HTML blocks opened blank. The block's saved markup is now read correctly, so previously published HTML shows up in both the content and code views instead of an empty placeholder.
+* Tested up to WordPress 7.1.
+
 
 = 0.4 =
 * Added a live demo preview (WordPress Playground blueprint).
