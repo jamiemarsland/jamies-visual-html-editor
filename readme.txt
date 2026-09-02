@@ -4,7 +4,7 @@ Tags: custom html, inline editing, block editor, full width, images
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5
+Stable tag: 0.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,7 +14,7 @@ Edit text, images, links and backgrounds directly in the WordPress Custom HTML b
 
 Jamie's Visual HTML Editor enhances the core Custom HTML block so you can paste in any HTML and let editors change the copy and images without touching the markup.
 
-* **Edit content** — render the HTML live and click any heading, paragraph, list item, link, or button to edit its text in place. Click any `<img>` to replace it from the Media Library, change its URL, or edit its alt text. Add `data-vc-bg` and an inline `background-image` on hero sections to make backgrounds editable too.
+* **Edit content** — render the HTML live and click any heading, paragraph, list item, link, or button to edit its text in place. Select text to get a small toolbar for **bold**, *italic*, and adding a link. Click any `<img>` to replace it from the Media Library, change its URL, or edit its alt text. Add `data-vc-bg` and an inline `background-image` on hero sections to make backgrounds editable too.
 * **Edit code** — the normal raw-HTML view for pasting or writing markup.
 * **Wide and Full width** — adds Wide and Full alignment options to the Custom HTML block. It does not change the block's content width; it only lets you choose Wide or Full alignment so full-bleed sections can break out of the theme's content area.
 
@@ -81,6 +81,9 @@ Clarifies the Wide/Full width description.
 Initial release.
 
 == Changelog ==
+
+= 0.6 =
+* New: select text in "Edit content" mode to get a small toolbar for bold, italic, and adding a link. Formatting is saved as clean `<strong>`, `<em>` and `<a>` tags.
 
 = 0.5 =
 * Fix: existing Custom HTML blocks opened blank. The block's saved markup is now read correctly, so previously published HTML shows up in both the content and code views instead of an empty placeholder.

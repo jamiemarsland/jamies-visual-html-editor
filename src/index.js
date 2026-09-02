@@ -558,6 +558,75 @@ function injectEditStyles( doc ) {
 			opacity: 1;
 			background: rgba(0, 163, 42, 0.95);
 		}
+		.vc-format-bar {
+			position: absolute;
+			z-index: 1000;
+			display: flex;
+			align-items: center;
+			padding: 2px;
+			background: #fff;
+			border-radius: 2px;
+			box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(0, 0, 0, 0.12);
+			font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		}
+		.vc-format-bar button {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 36px;
+			height: 36px;
+			padding: 0;
+			border: 0;
+			border-radius: 2px;
+			background: transparent;
+			color: #1e1e1e;
+			cursor: pointer;
+			font: inherit;
+		}
+		.vc-format-bar button:hover {
+			background: #f0f0f0;
+		}
+		.vc-format-bar button:focus {
+			outline: 1.5px solid #3858e9;
+			outline-offset: -1.5px;
+		}
+		.vc-format-bar button[hidden] {
+			display: none;
+		}
+		.vc-format-bar__link {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 2px 4px;
+		}
+		.vc-format-bar__link[hidden] {
+			display: none;
+		}
+		.vc-format-bar__link input {
+			height: 32px;
+			min-width: 210px;
+			padding: 0 8px;
+			color: #1e1e1e;
+			border: 1px solid #949494;
+			border-radius: 2px;
+			font: 400 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		}
+		.vc-format-bar__link input:focus {
+			border-color: #3858e9;
+			box-shadow: 0 0 0 1px #3858e9;
+			outline: none;
+		}
+		.vc-format-bar button.vc-format-bar__apply {
+			width: auto;
+			height: 32px;
+			padding: 0 12px;
+			background: #3858e9;
+			color: #fff;
+			font: 600 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		}
+		.vc-format-bar button.vc-format-bar__apply:hover {
+			background: #2a3fc0;
+		}
 	`;
 }
 
@@ -659,6 +728,25 @@ function VisualEditor( { content, setContent } ) {
 			element.classList.remove( BG_EDITOR, BG_SELECTED, BG_UPDATED );
 			element.removeAttribute( BG_STYLE_INDEX_ATTR );
 			element.removeAttribute( BG_SELECTOR_ATTR );
+		} );
+
+		// Normalise inline formatting produced by execCommand to semantic tags
+		// (<b> → <strong>, <i> → <em>) and drop empty inline wrappers.
+		const cloneDoc = clone.ownerDocument;
+		clone.querySelectorAll( 'b' ).forEach( ( el ) => {
+			const strong = cloneDoc.createElement( 'strong' );
+			strong.innerHTML = el.innerHTML;
+			el.replaceWith( strong );
+		} );
+		clone.querySelectorAll( 'i' ).forEach( ( el ) => {
+			const em = cloneDoc.createElement( 'em' );
+			em.innerHTML = el.innerHTML;
+			el.replaceWith( em );
+		} );
+		clone.querySelectorAll( 'strong, em, a' ).forEach( ( el ) => {
+			if ( ! el.textContent.trim() && ! el.querySelector( 'img' ) ) {
+				el.replaceWith( ...el.childNodes );
+			}
 		} );
 
 		const html = clone.innerHTML;
@@ -940,6 +1028,203 @@ function VisualEditor( { content, setContent } ) {
 		return () =>
 			container.removeEventListener( 'mousedown', onMouseDown, true );
 	}, [ selectImage, selectLink, selectBg ] );
+
+	// Floating format bubble: appears on a text selection inside an editable
+	// element and offers Bold, Italic and Link. It lives in the editor document
+	// (same document/iframe as the selection) so clicking it doesn't lose the
+	// selection, and is appended to the body — not the surface — because the
+	// surface's innerHTML is rewritten whenever content re-renders.
+	useEffect( () => {
+		const container = containerRef.current;
+		if ( ! container ) {
+			return undefined;
+		}
+		const doc = container.ownerDocument;
+		const win = doc.defaultView || window;
+
+		// Prefer semantic <b>/<i> tags over inline styles; syncContent then
+		// normalises them to <strong>/<em>.
+		try {
+			doc.execCommand( 'styleWithCSS', false, false );
+		} catch ( e ) {}
+
+		const bar = doc.createElement( 'div' );
+		bar.className = 'vc-format-bar';
+		bar.setAttribute( 'contenteditable', 'false' );
+		bar.style.display = 'none';
+		const svgIcon = ( path ) =>
+			'<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="' +
+			path +
+			'"></path></svg>';
+		const ICON_BOLD =
+			'M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z';
+		const ICON_ITALIC = 'M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4z';
+		const ICON_LINK =
+			'M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z';
+		const ICON_CLOSE =
+			'M13.06 12l6.47-6.47-1.06-1.06L12 10.94 5.53 4.47 4.47 5.53 10.94 12l-6.47 6.47 1.06 1.06L12 13.06l6.47 6.47 1.06-1.06z';
+		bar.innerHTML =
+			'<button type="button" data-cmd="bold" aria-label="' +
+			__( 'Bold', 'jamies-visual-html-editor' ) +
+			'">' +
+			svgIcon( ICON_BOLD ) +
+			'</button>' +
+			'<button type="button" data-cmd="italic" aria-label="' +
+			__( 'Italic', 'jamies-visual-html-editor' ) +
+			'">' +
+			svgIcon( ICON_ITALIC ) +
+			'</button>' +
+			'<button type="button" data-cmd="link" aria-label="' +
+			__( 'Add link', 'jamies-visual-html-editor' ) +
+			'">' +
+			svgIcon( ICON_LINK ) +
+			'</button>' +
+			'<span class="vc-format-bar__link" hidden>' +
+			'<input type="url" placeholder="https://example.com" />' +
+			'<button type="button" class="vc-format-bar__apply" data-cmd="apply-link">' +
+			__( 'Add', 'jamies-visual-html-editor' ) +
+			'</button>' +
+			'<button type="button" data-cmd="cancel-link" aria-label="' +
+			__( 'Cancel', 'jamies-visual-html-editor' ) +
+			'">' +
+			svgIcon( ICON_CLOSE ) +
+			'</button>' +
+			'</span>';
+		doc.body.appendChild( bar );
+
+		const linkWrap = bar.querySelector( '.vc-format-bar__link' );
+		const linkInput = linkWrap.querySelector( 'input' );
+		const mainBtns = bar.querySelectorAll(
+			'button[data-cmd="bold"],button[data-cmd="italic"],button[data-cmd="link"]'
+		);
+		let savedRange = null;
+
+		const inLinkMode = () => ! linkWrap.hasAttribute( 'hidden' );
+
+		const currentSelection = () => {
+			const sel = doc.getSelection();
+			if ( ! sel || sel.rangeCount === 0 || sel.isCollapsed ) {
+				return null;
+			}
+			const range = sel.getRangeAt( 0 );
+			let node = range.commonAncestorContainer;
+			if ( node.nodeType === 3 ) {
+				node = node.parentElement;
+			}
+			if ( ! node || ! container.contains( node ) ) {
+				return null;
+			}
+			if ( ! node.closest( '[' + EDITABLE_ATTR + ']' ) ) {
+				return null;
+			}
+			return range;
+		};
+
+		const showMainButtons = () => {
+			linkWrap.setAttribute( 'hidden', '' );
+			mainBtns.forEach( ( b ) => b.removeAttribute( 'hidden' ) );
+		};
+
+		const hideBar = () => {
+			bar.style.display = 'none';
+			showMainButtons();
+		};
+
+		const positionBar = ( range ) => {
+			const rect = range.getBoundingClientRect();
+			if ( ! rect || ( rect.width === 0 && rect.height === 0 ) ) {
+				return;
+			}
+			bar.style.display = 'flex';
+			const top = rect.top + win.scrollY - bar.offsetHeight - 8;
+			const left = rect.left + win.scrollX;
+			bar.style.top = Math.max( 0, top ) + 'px';
+			bar.style.left = Math.max( 0, left ) + 'px';
+		};
+
+		const updateBar = () => {
+			if ( inLinkMode() ) {
+				return;
+			}
+			const range = currentSelection();
+			if ( ! range ) {
+				hideBar();
+				return;
+			}
+			positionBar( range );
+		};
+
+		const onSelectionChange = () => updateBar();
+		doc.addEventListener( 'selectionchange', onSelectionChange );
+
+		// Keep the selection alive when clicking the bar (except the URL input,
+		// which legitimately takes focus — we restore the saved range on apply).
+		const onBarMouseDown = ( event ) => {
+			if ( event.target.tagName !== 'INPUT' ) {
+				event.preventDefault();
+			}
+		};
+		bar.addEventListener( 'mousedown', onBarMouseDown );
+
+		const onBarClick = ( event ) => {
+			const btn = event.target.closest( 'button' );
+			if ( ! btn ) {
+				return;
+			}
+			const cmd = btn.getAttribute( 'data-cmd' );
+			if ( cmd === 'bold' || cmd === 'italic' ) {
+				doc.execCommand( cmd, false, null );
+				syncContentRef.current();
+				updateBar();
+			} else if ( cmd === 'link' ) {
+				const range = currentSelection();
+				if ( ! range ) {
+					return;
+				}
+				savedRange = range.cloneRange();
+				mainBtns.forEach( ( b ) => b.setAttribute( 'hidden', '' ) );
+				linkWrap.removeAttribute( 'hidden' );
+				linkInput.value = '';
+				linkInput.focus();
+			} else if ( cmd === 'apply-link' ) {
+				const url = ( linkInput.value || '' ).trim();
+				if ( url && savedRange ) {
+					const sel = doc.getSelection();
+					sel.removeAllRanges();
+					sel.addRange( savedRange );
+					doc.execCommand( 'createLink', false, url );
+					syncContentRef.current();
+				}
+				savedRange = null;
+				hideBar();
+			} else if ( cmd === 'cancel-link' ) {
+				savedRange = null;
+				hideBar();
+			}
+		};
+		bar.addEventListener( 'click', onBarClick );
+
+		const onLinkKeyDown = ( event ) => {
+			event.stopPropagation();
+			if ( event.key === 'Enter' ) {
+				event.preventDefault();
+				bar.querySelector( 'button[data-cmd="apply-link"]' ).click();
+			} else if ( event.key === 'Escape' ) {
+				event.preventDefault();
+				savedRange = null;
+				hideBar();
+			}
+		};
+		linkInput.addEventListener( 'keydown', onLinkKeyDown );
+
+		return () => {
+			doc.removeEventListener( 'selectionchange', onSelectionChange );
+			bar.removeEventListener( 'mousedown', onBarMouseDown );
+			bar.removeEventListener( 'click', onBarClick );
+			linkInput.removeEventListener( 'keydown', onLinkKeyDown );
+			bar.remove();
+		};
+	}, [] );
 
 	const handleImageMediaSelect = useCallback(
 		( media ) => {
