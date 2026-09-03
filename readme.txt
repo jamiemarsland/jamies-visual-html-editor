@@ -4,7 +4,7 @@ Tags: custom html, inline editing, block editor, full width, images
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6
+Stable tag: 0.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,9 @@ No third-party libraries are bundled; the plugin relies only on the WordPress-pr
 
 == Upgrade Notice ==
 
+= 0.6.1 =
+Fixes edits to Custom HTML blocks not saving on some setups. Recommended for everyone.
+
 = 0.3 =
 Fixes the missing Wide/Full alignment control in the block toolbar, and adds a plugin icon.
 
@@ -81,6 +84,9 @@ Clarifies the Wide/Full width description.
 Initial release.
 
 == Changelog ==
+
+= 0.6.1 =
+* Fix: edits to a Custom HTML block were discarded on save on setups where the core block stores its markup outside the saved attributes — the Save/Update button appeared to work but the page was unchanged and the edits were lost when reopening. The block's content is now written back so edits persist reliably. Blocks you don't edit are left exactly as they were.
 
 = 0.6 =
 * New: select text in "Edit content" mode to get a small toolbar for bold, italic, and adding a link. Formatting is saved as clean `<strong>`, `<em>` and `<a>` tags.

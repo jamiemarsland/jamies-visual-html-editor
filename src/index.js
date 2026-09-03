@@ -13,13 +13,15 @@
 
 import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
-import { useSelect } from '@wordpress/data';
+import { useSelect, useDispatch } from '@wordpress/data';
+import { createBlock } from '@wordpress/blocks';
 import {
 	useState,
 	useRef,
 	useCallback,
 	useEffect,
 	Fragment,
+	RawHTML,
 } from '@wordpress/element';
 import {
 	BlockControls,
@@ -1483,7 +1485,7 @@ function VisualEditor( { content, setContent } ) {
 /* Block edit wrapper — toolbar toggle between content and code views         */
 /* -------------------------------------------------------------------------- */
 
-function EditHtmlBlock( { attributes, setAttributes, clientId } ) {
+function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	/*
 	 * core/html declares its `content` attribute without a `source`, so a block
 	 * parsed from already-saved post content arrives with empty attributes and
@@ -1502,6 +1504,44 @@ function EditHtmlBlock( { attributes, setAttributes, clientId } ) {
 
 	const attrContent = attributes.content || '';
 	const content = attrContent.trim() ? attrContent : savedMarkup;
+
+	const { replaceBlock } = useDispatch( 'core/block-editor' );
+
+	// core/html's `content` attribute has no `source` and its save() returns
+	// null, so the markup of an already-saved block lives only on the block's
+	// `originalContent`. When the editor serialises such a parsed block it keeps
+	// that `originalContent` verbatim and ignores any change made to the
+	// source-less ("local") `content` attribute — so every edit was silently
+	// discarded on save. Rebuilding the block as a freshly-created one drops the
+	// retained `originalContent`, so the editor serialises from the live
+	// `content` attribute and edits persist. We do this once, the first time the
+	// block is selected for editing (not on load), so simply opening a post that
+	// contains Custom HTML blocks doesn't mark it as changed.
+	const rebuiltRef = useRef( false );
+	useEffect( () => {
+		if (
+			! rebuiltRef.current &&
+			isSelected &&
+			! attrContent.trim() &&
+			savedMarkup.trim()
+		) {
+			rebuiltRef.current = true;
+			replaceBlock(
+				clientId,
+				createBlock( 'core/html', {
+					...attributes,
+					content: savedMarkup,
+				} )
+			);
+		}
+	}, [
+		isSelected,
+		savedMarkup,
+		attrContent,
+		attributes,
+		clientId,
+		replaceBlock,
+	] );
 
 	const [ mode, setMode ] = useState( () =>
 		content && content.trim() ? 'text' : 'code'
@@ -1594,6 +1634,26 @@ addFilter(
 			attributes: {
 				...settings.attributes,
 				align: { type: 'string' },
+			},
+			/*
+			 * On some builds core/html's own save() returns null and its
+			 * `content` is a non-persisted "local" attribute, so a block whose
+			 * content is edited (rather than kept verbatim from the originally
+			 * parsed markup) serialises to an empty `<!-- wp:html /-->` and the
+			 * edit is lost. Emitting the content ourselves as raw HTML — the
+			 * exact same markup core/html has always saved between its comment
+			 * delimiters — makes edited blocks persist. Untouched blocks are
+			 * unaffected: they keep their original markup via the editor's
+			 * originalContent fallback. (Paired with rebuilding a parsed block
+			 * as a fresh one on first edit, in EditHtmlBlock, so the editor
+			 * serialises from this save() instead of the retained markup.)
+			 */
+			save: ( { attributes } ) => {
+				const html =
+					attributes && attributes.content
+						? attributes.content
+						: '';
+				return html ? <RawHTML>{ html }</RawHTML> : null;
 			},
 		};
 	}
