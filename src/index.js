@@ -2,7 +2,8 @@
  * Jamie's Visual HTML Editor
  *
  * Enhances the core Custom HTML block (core/html):
- *   1. Adds an "Edit content" / "Edit code" toggle to the block toolbar.
+ *   1. Adds an "Edit content" toggle to the block toolbar. When it is off the
+ *      block is core's own, including its "Edit code" button and code editor.
  *   2. In "Edit content" mode, renders the HTML live and lets editors click
  *      text to edit it in place, click images to replace them, click links to
  *      edit them, and click hero backgrounds to swap the image.
@@ -14,7 +15,7 @@
 import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { useSelect, useDispatch } from '@wordpress/data';
-import { createBlock } from '@wordpress/blocks';
+import { createBlock, getBlockContent } from '@wordpress/blocks';
 import {
 	useState,
 	useRef,
@@ -27,7 +28,6 @@ import {
 	BlockControls,
 	BlockAlignmentControl,
 	useBlockProps,
-	PlainText,
 	MediaUploadCheck,
 } from '@wordpress/block-editor';
 import {
@@ -1485,41 +1485,57 @@ function VisualEditor( { content, setContent } ) {
 /* Block edit wrapper — toolbar toggle between content and code views         */
 /* -------------------------------------------------------------------------- */
 
-function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
+function EditHtmlBlock( { BlockEdit, ...props } ) {
+	const { attributes, setAttributes, clientId, isSelected } = props;
+
 	/*
-	 * core/html declares its `content` attribute without a `source`, so a block
-	 * parsed from already-saved post content arrives with empty attributes and
-	 * the markup sitting on the block's `originalContent` instead. Reading only
-	 * attributes.content meant every previously saved block opened blank.
-	 * Fall back to the saved markup for display, without writing it back until
-	 * the editor actually changes something.
+	 * Where core/html keeps its markup depends on the WordPress version:
+	 *   - Up to 7.0 it is the `content` attribute.
+	 *   - From 7.1 it is the block's `innerContent`; `content` is a deprecated,
+	 *     non-persisted ("local") attribute that core's own edit component
+	 *     moves into `innerContent` and clears as soon as it sees it.
+	 * We hand the block back to core's edit component for "Edit code", so the
+	 * content view has to read and write the same place core does — otherwise
+	 * the two views drift apart and edits are lost.
 	 */
-	const savedMarkup = useSelect(
+	const { savedMarkup, blockContent, usesInnerContent } = useSelect(
 		( select ) => {
 			const block = select( 'core/block-editor' ).getBlock( clientId );
-			return block?.originalContent || '';
+			const contentAttribute =
+				select( 'core/blocks' ).getBlockType( 'core/html' )?.attributes
+					?.content;
+			return {
+				savedMarkup: block?.originalContent || '',
+				blockContent: block ? getBlockContent( block ) : '',
+				usesInnerContent:
+					contentAttribute?.role === 'local' &&
+					Array.isArray( block?.innerContent ),
+			};
 		},
 		[ clientId ]
 	);
 
 	const attrContent = attributes.content || '';
-	const content = attrContent.trim() ? attrContent : savedMarkup;
+	let content = attrContent;
+	if ( ! content.trim() ) {
+		content = usesInnerContent ? blockContent : savedMarkup;
+	}
 
-	const { replaceBlock } = useDispatch( 'core/block-editor' );
+	const { replaceBlock, updateBlock } = useDispatch( 'core/block-editor' );
 
-	// core/html's `content` attribute has no `source` and its save() returns
-	// null, so the markup of an already-saved block lives only on the block's
-	// `originalContent`. When the editor serialises such a parsed block it keeps
-	// that `originalContent` verbatim and ignores any change made to the
-	// source-less ("local") `content` attribute — so every edit was silently
-	// discarded on save. Rebuilding the block as a freshly-created one drops the
-	// retained `originalContent`, so the editor serialises from the live
-	// `content` attribute and edits persist. We do this once, the first time the
-	// block is selected for editing (not on load), so simply opening a post that
+	// Fallback for builds where `content` is a "local" attribute but the block
+	// carries no `innerContent` to write to: the editor serialises a parsed
+	// block from its retained `originalContent` and ignores the attribute, so
+	// every edit was silently discarded on save. Rebuilding the block as a
+	// freshly-created one drops the retained `originalContent`, so the editor
+	// serialises from the live `content` attribute (via the save() override
+	// below) and edits persist. We do this once, the first time the block is
+	// selected for editing (not on load), so simply opening a post that
 	// contains Custom HTML blocks doesn't mark it as changed.
 	const rebuiltRef = useRef( false );
 	useEffect( () => {
 		if (
+			! usesInnerContent &&
 			! rebuiltRef.current &&
 			isSelected &&
 			! attrContent.trim() &&
@@ -1535,6 +1551,7 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 			);
 		}
 	}, [
+		usesInnerContent,
 		isSelected,
 		savedMarkup,
 		attrContent,
@@ -1546,27 +1563,47 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	const [ mode, setMode ] = useState( () =>
 		content && content.trim() ? 'text' : 'code'
 	);
-	const blockProps = useBlockProps( { className: 'vc-html-edit' } );
-	const setContent = ( next ) => setAttributes( { content: next } );
+	const setContent = ( next ) => {
+		if ( usesInnerContent ) {
+			updateBlock( clientId, {
+				attributes: { content: undefined },
+				innerContent: next ? [ next ] : [],
+			} );
+		} else {
+			setAttributes( { content: next } );
+		}
+	};
+
+	const toggle = (
+		<BlockControls>
+			<ToolbarGroup>
+				<ToolbarButton
+					isPressed={ mode === 'text' }
+					onClick={ () =>
+						setMode( mode === 'text' ? 'code' : 'text' )
+					}
+				>
+					{ __( 'Edit content', 'jamies-visual-html-editor' ) }
+				</ToolbarButton>
+			</ToolbarGroup>
+		</BlockControls>
+	);
+
+	// Outside "Edit content" the block is core's own: its preview, its
+	// placeholder, its "Edit code" button and code editor, and the alignment
+	// control core adds for the `align` support registered below.
+	if ( mode !== 'text' ) {
+		return (
+			<Fragment>
+				{ toggle }
+				<BlockEdit { ...props } />
+			</Fragment>
+		);
+	}
 
 	return (
 		<Fragment>
-			<BlockControls>
-				<ToolbarGroup>
-					<ToolbarButton
-						isPressed={ mode === 'text' }
-						onClick={ () => setMode( 'text' ) }
-					>
-						{ __( 'Edit content', 'jamies-visual-html-editor' ) }
-					</ToolbarButton>
-					<ToolbarButton
-						isPressed={ mode === 'code' }
-						onClick={ () => setMode( 'code' ) }
-					>
-						{ __( 'Edit code', 'jamies-visual-html-editor' ) }
-					</ToolbarButton>
-				</ToolbarGroup>
-			</BlockControls>
+			{ toggle }
 			<BlockControls group="block">
 				<BlockAlignmentControl
 					value={ attributes.align }
@@ -1574,29 +1611,17 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 					controls={ [ 'wide', 'full' ] }
 				/>
 			</BlockControls>
-			<div { ...blockProps }>
-				{ mode === 'text' ? (
-					<VisualEditor
-						content={ content }
-						setContent={ setContent }
-					/>
-				) : (
-					<PlainText
-						value={ content }
-						onChange={ setContent }
-						className="vc-html-edit__code"
-						placeholder={ __(
-							'Paste or write HTML here, then switch to “Edit content”.',
-							'jamies-visual-html-editor'
-						) }
-						aria-label={ __(
-							'Custom HTML',
-							'jamies-visual-html-editor'
-						) }
-					/>
-				) }
-			</div>
+			<HtmlContentView content={ content } setContent={ setContent } />
 		</Fragment>
+	);
+}
+
+function HtmlContentView( { content, setContent } ) {
+	const blockProps = useBlockProps( { className: 'vc-html-edit' } );
+	return (
+		<div { ...blockProps }>
+			<VisualEditor content={ content } setContent={ setContent } />
+		</div>
 	);
 }
 
@@ -1610,7 +1635,7 @@ addFilter(
 	createHigherOrderComponent(
 		( BlockEdit ) => ( props ) =>
 			props.name === 'core/html' ? (
-				<EditHtmlBlock { ...props } />
+				<EditHtmlBlock { ...props } BlockEdit={ BlockEdit } />
 			) : (
 				<BlockEdit { ...props } />
 			),

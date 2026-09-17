@@ -3,14 +3,8 @@
  *
  * Loaded only in the block editor. The interactive "edit surface" outlines and
  * badges are injected at runtime (see injectEditStyles in index.js); these
- * rules cover the toolbar code view and the editing modals.
+ * rules cover the editing modals.
  */
-
-.vc-html-edit__code {
-	font-family: Menlo, Consolas, monaco, monospace;
-	font-size: 13px;
-	line-height: 1.5;
-}
 
 .vc-edit-modal__fields {
 	display: flex;

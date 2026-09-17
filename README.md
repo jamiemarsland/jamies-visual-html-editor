@@ -3,7 +3,7 @@
 A WordPress plugin that enhances the core **Custom HTML block** so editors can change copy and media without touching the markup.
 
 - **Edit content** — render the HTML live and click any heading, paragraph, list item, link, or button to edit its text in place. Click an image to replace it from the Media Library, change its URL, or edit its alt text. Click a hero background to swap the photo.
-- **Edit code** — the normal raw-HTML view for pasting or writing markup.
+- **Edit code** — core's own code editor for the block, left untouched. Turn "Edit content" off and the block behaves exactly as it does without the plugin.
 - **Wide and Full width** — adds Wide and Full alignment to the Custom HTML block.
 
 Content is stored as a native Custom HTML block, so revisions and saving behave exactly as they do in core.
