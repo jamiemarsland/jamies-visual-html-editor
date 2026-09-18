@@ -1497,7 +1497,20 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	const savedMarkup = useSelect(
 		( select ) => {
 			const block = select( 'core/block-editor' ).getBlock( clientId );
-			return block?.originalContent || '';
+			if ( ! block ) {
+				return '';
+			}
+			if ( block.originalContent ) {
+				return block.originalContent;
+			}
+			// Freshly pasted/created blocks can keep their markup on
+			// innerContent rather than originalContent or the (source-less,
+			// "local") content attribute; fall back to it so the visual view
+			// still finds the HTML.
+			if ( Array.isArray( block.innerContent ) ) {
+				return block.innerContent.filter( Boolean ).join( '' );
+			}
+			return '';
 		},
 		[ clientId ]
 	);
@@ -1546,6 +1559,24 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	const [ mode, setMode ] = useState( () =>
 		content && content.trim() ? 'text' : 'code'
 	);
+	// Open in the visual "Edit content" view as soon as there's content to show
+	// — most importantly straight after a paste, where the block can mount empty
+	// and fill in a tick later. Respect an explicit choice of view by the editor.
+	const modeChosenRef = useRef( false );
+	const chooseMode = ( next ) => {
+		modeChosenRef.current = true;
+		setMode( next );
+	};
+	useEffect( () => {
+		if (
+			! modeChosenRef.current &&
+			mode === 'code' &&
+			content &&
+			content.trim()
+		) {
+			setMode( 'text' );
+		}
+	}, [ content, mode ] );
 	const blockProps = useBlockProps( { className: 'vc-html-edit' } );
 	const setContent = ( next ) => setAttributes( { content: next } );
 
@@ -1555,13 +1586,13 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 				<ToolbarGroup>
 					<ToolbarButton
 						isPressed={ mode === 'text' }
-						onClick={ () => setMode( 'text' ) }
+						onClick={ () => chooseMode( 'text' ) }
 					>
 						{ __( 'Edit content', 'jamies-visual-html-editor' ) }
 					</ToolbarButton>
 					<ToolbarButton
 						isPressed={ mode === 'code' }
-						onClick={ () => setMode( 'code' ) }
+						onClick={ () => chooseMode( 'code' ) }
 					>
 						{ __( 'Edit code', 'jamies-visual-html-editor' ) }
 					</ToolbarButton>
@@ -1618,6 +1649,42 @@ addFilter(
 	)
 );
 
+/**
+ * Heuristic for the paste-to-HTML transform below: does a pasted top-level node
+ * look like "designed" markup we should keep verbatim in a Custom HTML block,
+ * rather than plain prose that core should turn into normal blocks? Plain
+ * paragraphs, headings, lists, links and images fall through to core; wrapper
+ * elements, inline styles, custom classes and <style> tags are captured.
+ */
+function isDesignedMarkup( node ) {
+	if ( ! node || node.nodeType !== 1 ) {
+		return false;
+	}
+	const tag = node.nodeName.toLowerCase();
+	if ( tag === 'style' ) {
+		return true;
+	}
+	const structural = [
+		'div', 'section', 'article', 'header',
+		'footer', 'aside', 'main', 'figure', 'table',
+	].includes( tag );
+	const hasInlineStyle =
+		( node.hasAttribute && node.hasAttribute( 'style' ) ) ||
+		( node.querySelector && !! node.querySelector( '[style]' ) );
+	const hasStyleTag = node.querySelector && !! node.querySelector( 'style' );
+	const hasClass =
+		( node.getAttribute && !! node.getAttribute( 'class' ) ) ||
+		( node.querySelector && !! node.querySelector( '[class]' ) );
+	const plain = [
+		'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+		'a', 'img', 'blockquote', 'strong', 'em', 'b', 'i', 'span', 'br',
+	].includes( tag );
+	if ( plain && ! hasInlineStyle && ! hasClass && ! hasStyleTag ) {
+		return false;
+	}
+	return structural || hasInlineStyle || hasStyleTag || hasClass;
+}
+
 addFilter(
 	'blocks.registerBlockType',
 	'jamies-visual-html-editor/html-align-support',
@@ -1654,6 +1721,35 @@ addFilter(
 						? attributes.content
 						: '';
 				return html ? <RawHTML>{ html }</RawHTML> : null;
+			},
+			/*
+			 * Paste-to-HTML (prototype): when pasted content is clearly designed
+			 * markup (wrapper elements, inline styles, custom classes, a <style>
+			 * tag) rather than plain prose, capture it as a Custom HTML block
+			 * instead of letting core split it into separate blocks. Plain text,
+			 * headings, lists and images still paste as normal blocks, so
+			 * everyday pasting is untouched.
+			 */
+			transforms: {
+				...settings.transforms,
+				from: [
+					{
+						type: 'raw',
+						priority: 8,
+						isMatch: ( node ) => {
+							try {
+								return isDesignedMarkup( node );
+							} catch ( e ) {
+								return false;
+							}
+						},
+						transform: ( node ) =>
+							createBlock( 'core/html', {
+								content: node.outerHTML,
+							} ),
+					},
+					...( settings.transforms?.from || [] ),
+				],
 			},
 		};
 	}
