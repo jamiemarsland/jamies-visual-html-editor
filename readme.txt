@@ -4,7 +4,7 @@ Tags: custom html, inline editing, block editor, full width, images
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.1
+Stable tag: 0.6.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,9 @@ No third-party libraries are bundled; the plugin relies only on the WordPress-pr
 
 == Upgrade Notice ==
 
+= 0.6.2 =
+Fixes images sized by an ancestor (absolute or percentage height) showing at 0px height in the editor.
+
 = 0.6.1 =
 Fixes edits to Custom HTML blocks not saving on some setups. Recommended for everyone.
 
@@ -84,6 +87,9 @@ Clarifies the Wide/Full width description.
 Initial release.
 
 == Changelog ==
+
+= 0.6.2 =
+* Fix: images whose size comes from an ancestor — absolutely positioned images, or images using a percentage height — displayed at 0px height (invisible) in the editor, even though they rendered correctly on the front end. The editor-only wrapper the plugin adds around images no longer collapses those images; they now render at the right size in the editor too. Ordinary images are unchanged.
 
 = 0.6.1 =
 * Fix: edits to a Custom HTML block were discarded on save on setups where the core block stores its markup outside the saved attributes — the Save/Update button appeared to work but the page was unchanged and the edits were lost when reopening. The block's content is now written back so edits persist reliably. Blocks you don't edit are left exactly as they were.

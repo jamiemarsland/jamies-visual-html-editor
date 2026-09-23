@@ -288,6 +288,28 @@ function decorateText( container ) {
 		);
 }
 
+/**
+ * Whether an image gets its size from an ancestor rather than from its own
+ * box — i.e. it is absolutely/fixed positioned, or uses a percentage height.
+ * Such images break if we wrap them in a positioned, zero-height span (the
+ * wrapper becomes their containing block and collapses to 0px), so those
+ * wrappers are made layout-transparent instead. See `.vc-image-editor--bare`.
+ */
+function imageSizedByAncestor( img ) {
+	const inline = ( img.getAttribute( 'style' ) || '' ).toLowerCase();
+	if ( /height\s*:\s*[0-9.]+\s*%/.test( inline ) ) {
+		return true;
+	}
+	const view = img.ownerDocument && img.ownerDocument.defaultView;
+	if ( view ) {
+		const pos = view.getComputedStyle( img ).position;
+		if ( pos === 'absolute' || pos === 'fixed' ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 function decorateImages( container ) {
 	container.querySelectorAll( 'img' ).forEach( ( img ) => {
 		if (
@@ -313,6 +335,13 @@ function decorateImages( container ) {
 			parent.insertBefore( wrap, img );
 			wrap.appendChild( img );
 			wrap.appendChild( badge );
+			// Images sized by an ancestor collapse to 0px if the wrapper
+			// becomes their containing block, so make the wrapper
+			// layout-transparent for those (the image then measures against
+			// its real ancestor, exactly as on the front end).
+			if ( imageSizedByAncestor( img ) ) {
+				wrap.classList.add( 'vc-image-editor--bare' );
+			}
 		}
 	} );
 }
@@ -446,6 +475,20 @@ function injectEditStyles( doc ) {
 			display: inline-block;
 			max-width: 100%;
 			line-height: 0;
+		}
+		/*
+		 * Ancestor-sized images (absolute/fixed, or percentage height) break
+		 * inside the positioned, zero-height wrapper above, so their wrapper is
+		 * made layout-transparent: it generates no box, the image measures
+		 * against its real ancestor (as on the front end), and the centred
+		 * badge — which has nothing to anchor to — is hidden. The image still
+		 * shows its hover outline and stays click-to-edit.
+		 */
+		.vc-edit-surface .vc-image-editor--bare {
+			display: contents;
+		}
+		.vc-edit-surface .vc-image-editor--bare .vc-image-editor__badge {
+			display: none;
 		}
 		.vc-edit-surface .vc-image-editor__badge {
 			position: absolute;
@@ -1497,20 +1540,7 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	const savedMarkup = useSelect(
 		( select ) => {
 			const block = select( 'core/block-editor' ).getBlock( clientId );
-			if ( ! block ) {
-				return '';
-			}
-			if ( block.originalContent ) {
-				return block.originalContent;
-			}
-			// Freshly pasted/created blocks can keep their markup on
-			// innerContent rather than originalContent or the (source-less,
-			// "local") content attribute; fall back to it so the visual view
-			// still finds the HTML.
-			if ( Array.isArray( block.innerContent ) ) {
-				return block.innerContent.filter( Boolean ).join( '' );
-			}
-			return '';
+			return block?.originalContent || '';
 		},
 		[ clientId ]
 	);
@@ -1559,24 +1589,6 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 	const [ mode, setMode ] = useState( () =>
 		content && content.trim() ? 'text' : 'code'
 	);
-	// Open in the visual "Edit content" view as soon as there's content to show
-	// — most importantly straight after a paste, where the block can mount empty
-	// and fill in a tick later. Respect an explicit choice of view by the editor.
-	const modeChosenRef = useRef( false );
-	const chooseMode = ( next ) => {
-		modeChosenRef.current = true;
-		setMode( next );
-	};
-	useEffect( () => {
-		if (
-			! modeChosenRef.current &&
-			mode === 'code' &&
-			content &&
-			content.trim()
-		) {
-			setMode( 'text' );
-		}
-	}, [ content, mode ] );
 	const blockProps = useBlockProps( { className: 'vc-html-edit' } );
 	const setContent = ( next ) => setAttributes( { content: next } );
 
@@ -1586,13 +1598,13 @@ function EditHtmlBlock( { attributes, setAttributes, clientId, isSelected } ) {
 				<ToolbarGroup>
 					<ToolbarButton
 						isPressed={ mode === 'text' }
-						onClick={ () => chooseMode( 'text' ) }
+						onClick={ () => setMode( 'text' ) }
 					>
 						{ __( 'Edit content', 'jamies-visual-html-editor' ) }
 					</ToolbarButton>
 					<ToolbarButton
 						isPressed={ mode === 'code' }
-						onClick={ () => chooseMode( 'code' ) }
+						onClick={ () => setMode( 'code' ) }
 					>
 						{ __( 'Edit code', 'jamies-visual-html-editor' ) }
 					</ToolbarButton>
@@ -1649,42 +1661,6 @@ addFilter(
 	)
 );
 
-/**
- * Heuristic for the paste-to-HTML transform below: does a pasted top-level node
- * look like "designed" markup we should keep verbatim in a Custom HTML block,
- * rather than plain prose that core should turn into normal blocks? Plain
- * paragraphs, headings, lists, links and images fall through to core; wrapper
- * elements, inline styles, custom classes and <style> tags are captured.
- */
-function isDesignedMarkup( node ) {
-	if ( ! node || node.nodeType !== 1 ) {
-		return false;
-	}
-	const tag = node.nodeName.toLowerCase();
-	if ( tag === 'style' ) {
-		return true;
-	}
-	const structural = [
-		'div', 'section', 'article', 'header',
-		'footer', 'aside', 'main', 'figure', 'table',
-	].includes( tag );
-	const hasInlineStyle =
-		( node.hasAttribute && node.hasAttribute( 'style' ) ) ||
-		( node.querySelector && !! node.querySelector( '[style]' ) );
-	const hasStyleTag = node.querySelector && !! node.querySelector( 'style' );
-	const hasClass =
-		( node.getAttribute && !! node.getAttribute( 'class' ) ) ||
-		( node.querySelector && !! node.querySelector( '[class]' ) );
-	const plain = [
-		'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
-		'a', 'img', 'blockquote', 'strong', 'em', 'b', 'i', 'span', 'br',
-	].includes( tag );
-	if ( plain && ! hasInlineStyle && ! hasClass && ! hasStyleTag ) {
-		return false;
-	}
-	return structural || hasInlineStyle || hasStyleTag || hasClass;
-}
-
 addFilter(
 	'blocks.registerBlockType',
 	'jamies-visual-html-editor/html-align-support',
@@ -1721,35 +1697,6 @@ addFilter(
 						? attributes.content
 						: '';
 				return html ? <RawHTML>{ html }</RawHTML> : null;
-			},
-			/*
-			 * Paste-to-HTML (prototype): when pasted content is clearly designed
-			 * markup (wrapper elements, inline styles, custom classes, a <style>
-			 * tag) rather than plain prose, capture it as a Custom HTML block
-			 * instead of letting core split it into separate blocks. Plain text,
-			 * headings, lists and images still paste as normal blocks, so
-			 * everyday pasting is untouched.
-			 */
-			transforms: {
-				...settings.transforms,
-				from: [
-					{
-						type: 'raw',
-						priority: 8,
-						isMatch: ( node ) => {
-							try {
-								return isDesignedMarkup( node );
-							} catch ( e ) {
-								return false;
-							}
-						},
-						transform: ( node ) =>
-							createBlock( 'core/html', {
-								content: node.outerHTML,
-							} ),
-					},
-					...( settings.transforms?.from || [] ),
-				],
 			},
 		};
 	}

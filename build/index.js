@@ -282,6 +282,20 @@
       (element) => element.setAttribute("contenteditable", "false")
     );
   }
+  function imageSizedByAncestor(img) {
+    const inline = (img.getAttribute("style") || "").toLowerCase();
+    if (/height\s*:\s*[0-9.]+\s*%/.test(inline)) {
+      return true;
+    }
+    const view = img.ownerDocument && img.ownerDocument.defaultView;
+    if (view) {
+      const pos = view.getComputedStyle(img).position;
+      if (pos === "absolute" || pos === "fixed") {
+        return true;
+      }
+    }
+    return false;
+  }
   function decorateImages(container) {
     container.querySelectorAll("img").forEach((img) => {
       if (img.closest("svg") || img.closest("[" + IMAGE_WRAP_ATTR + "]")) {
@@ -301,6 +315,9 @@
         parent.insertBefore(wrap, img);
         wrap.appendChild(img);
         wrap.appendChild(badge);
+        if (imageSizedByAncestor(img)) {
+          wrap.classList.add("vc-image-editor--bare");
+        }
       }
     });
   }
@@ -406,6 +423,20 @@
 			display: inline-block;
 			max-width: 100%;
 			line-height: 0;
+		}
+		/*
+		 * Ancestor-sized images (absolute/fixed, or percentage height) break
+		 * inside the positioned, zero-height wrapper above, so their wrapper is
+		 * made layout-transparent: it generates no box, the image measures
+		 * against its real ancestor (as on the front end), and the centred
+		 * badge \u2014 which has nothing to anchor to \u2014 is hidden. The image still
+		 * shows its hover outline and stays click-to-edit.
+		 */
+		.vc-edit-surface .vc-image-editor--bare {
+			display: contents;
+		}
+		.vc-edit-surface .vc-image-editor--bare .vc-image-editor__badge {
+			display: none;
 		}
 		.vc-edit-surface .vc-image-editor__badge {
 			position: absolute;
@@ -1241,16 +1272,7 @@
     const savedMarkup = (0, import_data.useSelect)(
       (select) => {
         const block = select("core/block-editor").getBlock(clientId);
-        if (!block) {
-          return "";
-        }
-        if (block.originalContent) {
-          return block.originalContent;
-        }
-        if (Array.isArray(block.innerContent)) {
-          return block.innerContent.filter(Boolean).join("");
-        }
-        return "";
+        return block?.originalContent || "";
       },
       [clientId]
     );
@@ -1280,30 +1302,20 @@
     const [mode, setMode] = (0, import_element.useState)(
       () => content && content.trim() ? "text" : "code"
     );
-    const modeChosenRef = (0, import_element.useRef)(false);
-    const chooseMode = (next) => {
-      modeChosenRef.current = true;
-      setMode(next);
-    };
-    (0, import_element.useEffect)(() => {
-      if (!modeChosenRef.current && mode === "code" && content && content.trim()) {
-        setMode("text");
-      }
-    }, [content, mode]);
     const blockProps = (0, import_block_editor.useBlockProps)({ className: "vc-html-edit" });
     const setContent = (next) => setAttributes({ content: next });
     return /* @__PURE__ */ window.wp.element.createElement(import_element.Fragment, null, /* @__PURE__ */ window.wp.element.createElement(import_block_editor.BlockControls, null, /* @__PURE__ */ window.wp.element.createElement(import_components.ToolbarGroup, null, /* @__PURE__ */ window.wp.element.createElement(
       import_components.ToolbarButton,
       {
         isPressed: mode === "text",
-        onClick: () => chooseMode("text")
+        onClick: () => setMode("text")
       },
       (0, import_i18n.__)("Edit content", "jamies-visual-html-editor")
     ), /* @__PURE__ */ window.wp.element.createElement(
       import_components.ToolbarButton,
       {
         isPressed: mode === "code",
-        onClick: () => chooseMode("code")
+        onClick: () => setMode("code")
       },
       (0, import_i18n.__)("Edit code", "jamies-visual-html-editor")
     ))), /* @__PURE__ */ window.wp.element.createElement(import_block_editor.BlockControls, { group: "block" }, /* @__PURE__ */ window.wp.element.createElement(
@@ -1344,54 +1356,6 @@
       "withHtmlTextEdit"
     )
   );
-  function isDesignedMarkup(node) {
-    if (!node || node.nodeType !== 1) {
-      return false;
-    }
-    const tag = node.nodeName.toLowerCase();
-    if (tag === "style") {
-      return true;
-    }
-    const structural = [
-      "div",
-      "section",
-      "article",
-      "header",
-      "footer",
-      "aside",
-      "main",
-      "figure",
-      "table"
-    ].includes(tag);
-    const hasInlineStyle = node.hasAttribute && node.hasAttribute("style") || node.querySelector && !!node.querySelector("[style]");
-    const hasStyleTag = node.querySelector && !!node.querySelector("style");
-    const hasClass = node.getAttribute && !!node.getAttribute("class") || node.querySelector && !!node.querySelector("[class]");
-    const plain = [
-      "p",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "h5",
-      "h6",
-      "ul",
-      "ol",
-      "li",
-      "a",
-      "img",
-      "blockquote",
-      "strong",
-      "em",
-      "b",
-      "i",
-      "span",
-      "br"
-    ].includes(tag);
-    if (plain && !hasInlineStyle && !hasClass && !hasStyleTag) {
-      return false;
-    }
-    return structural || hasInlineStyle || hasStyleTag || hasClass;
-  }
   (0, import_hooks.addFilter)(
     "blocks.registerBlockType",
     "jamies-visual-html-editor/html-align-support",
@@ -1425,34 +1389,6 @@
         save: ({ attributes }) => {
           const html = attributes && attributes.content ? attributes.content : "";
           return html ? /* @__PURE__ */ window.wp.element.createElement(import_element.RawHTML, null, html) : null;
-        },
-        /*
-         * Paste-to-HTML (prototype): when pasted content is clearly designed
-         * markup (wrapper elements, inline styles, custom classes, a <style>
-         * tag) rather than plain prose, capture it as a Custom HTML block
-         * instead of letting core split it into separate blocks. Plain text,
-         * headings, lists and images still paste as normal blocks, so
-         * everyday pasting is untouched.
-         */
-        transforms: {
-          ...settings.transforms,
-          from: [
-            {
-              type: "raw",
-              priority: 8,
-              isMatch: (node) => {
-                try {
-                  return isDesignedMarkup(node);
-                } catch (e) {
-                  return false;
-                }
-              },
-              transform: (node) => (0, import_blocks.createBlock)("core/html", {
-                content: node.outerHTML
-              })
-            },
-            ...settings.transforms?.from || []
-          ]
         }
       };
     }
