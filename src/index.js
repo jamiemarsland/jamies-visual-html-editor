@@ -258,13 +258,32 @@ function preventLinkClick( event ) {
 /* Decoration — turn pasted HTML into an editable surface                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Whether an element has text of its own — a non-whitespace text node as a
+ * direct child, rather than only text inside nested elements.
+ *
+ * Ported from PR #3 by Tom Rhodes (tommusrhodus).
+ */
+function hasDirectText( element ) {
+	return Array.from( element.childNodes ).some(
+		( node ) => node.nodeType === 3 && node.textContent.trim()
+	);
+}
+
 function decorateText( container ) {
 	container
 		.querySelectorAll(
-			'h1, h2, h3, h4, h5, h6, p, li, span, a, button, blockquote, figcaption, label, strong, em'
+			'h1, h2, h3, h4, h5, h6, p, li, span, a, button, blockquote, figcaption, label, strong, em, div'
 		)
 		.forEach( ( element ) => {
 			if ( element.closest( 'style, script, svg' ) ) {
+				return;
+			}
+			// A div is usually layout, so only treat it as text when it holds
+			// text directly (e.g. <div class="price">$49</div>). Divs that only
+			// contain other elements are left alone, so wrappers don't become
+			// one big editable region.
+			if ( element.tagName === 'DIV' && ! hasDirectText( element ) ) {
 				return;
 			}
 			if (

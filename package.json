@@ -1,6 +1,6 @@
 {
   "name": "jamies-visual-html-editor",
-  "version": "0.3.0",
+  "version": "0.6.2",
   "description": "Enhances the WordPress core Custom HTML block with inline text/image/link/background editing and Wide/Full width alignment.",
   "author": "Jamie Marsland",
   "license": "GPL-2.0-or-later",
@@ -18,7 +18,8 @@
   },
   "scripts": {
     "build": "wp-scripts build",
-    "start": "wp-scripts start"
+    "start": "wp-scripts start",
+    "check": "node --check tests/vhe-tests.js && echo 'tests: syntax OK'"
   },
   "devDependencies": {
     "@wordpress/scripts": "^27.0.0"

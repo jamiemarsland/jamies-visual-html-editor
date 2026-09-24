@@ -90,6 +90,7 @@ Initial release.
 
 = 0.6.2 =
 * Fix: images whose size comes from an ancestor — absolutely positioned images, or images using a percentage height — displayed at 0px height (invisible) in the editor, even though they rendered correctly on the front end. The editor-only wrapper the plugin adds around images no longer collapses those images; they now render at the right size in the editor too. Ordinary images are unchanged.
+* New: text sitting directly inside a `<div>` (for example `<div class="price">$49</div>`) can now be clicked and edited in "Edit content". Divs that only contain other elements are left alone, so layout wrappers don't become one big editable region. Thanks to Tom Rhodes for the contribution.
 
 = 0.6.1 =
 * Fix: edits to a Custom HTML block were discarded on save on setups where the core block stores its markup outside the saved attributes — the Save/Update button appeared to work but the page was unchanged and the edits were lost when reopening. The block's content is now written back so edits persist reliably. Blocks you don't edit are left exactly as they were.

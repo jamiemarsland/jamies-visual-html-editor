@@ -9,6 +9,11 @@ package.json
 package-lock.json
 README.md
 
+# In-browser test suite and fixture — repo only, never in the plugin zip.
+# (The plugin's test mode is inert without these files.)
+tests
+tests/**
+
 # WordPress.org listing assets (screenshots, icon, banner). Pushed to the SVN
 # assets/ directory on release; never shipped inside the installable plugin zip.
 .wordpress-org
